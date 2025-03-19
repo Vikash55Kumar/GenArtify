@@ -14,7 +14,7 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(cors({
     // origin: "http://localhost:5173",
-    origin: [process.env.CORES_ORIGIN || "http://localhost:5173"],
+    origin: [process.env.CORES_ORIGIN || "http://genartify.ecovix.online"],
     methods: 'DELETE, POST, GET, PUT',
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'], 
     credentials: true,
@@ -28,7 +28,7 @@ app.use('/api/v1/image', imageRouter)
 app.get('/', (req, res) => res.send('API Working'))
 
 const __dirname = path.resolve();
-const buildPath = path.join(__dirname, "../Frontend/dist");
+const buildPath = path.join(__dirname, "../frontend/dist");
 app.use(express.static(buildPath, {
     maxAge: '1d',
     etag: false,
