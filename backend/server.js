@@ -14,7 +14,7 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(cors({
     // origin: "http://localhost:5173",
-    origin: [process.env.CORES_ORIGIN || "http://genartify.ecovix.online"],
+    origin: [process.env.CORES_ORIGIN || "https://genartify.ecovix.online"],
     methods: 'DELETE, POST, GET, PUT',
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'], 
     credentials: true,
