@@ -9,5 +9,6 @@ userRouter.post('/login', userLogin)
 userRouter.get('/credits', userAuth, userCredit)
 userRouter.post('/razor-payment', userAuth, razorpayPayment)
 userRouter.post('/verify-payment', verifyPayment)
+userRouter.route("/active").get((req, res) => {res.send("active")});
 
 export default userRouter;
