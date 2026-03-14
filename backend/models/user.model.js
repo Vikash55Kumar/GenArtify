@@ -30,6 +30,11 @@ const userSchema = new mongoose.Schema({
             default: Date.now 
         }
     }],
+    workspaceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "workspace",
+        index: true
+    },
 
 }, { timestamps: true })
 

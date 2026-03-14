@@ -9,6 +9,7 @@ import { Signup } from './pages/Signup';
 import { ToastContainer } from 'react-toastify';
 import { AuthContext } from "./utility/AuthContext";
 import Footer from './components/Footer';
+import Policy from './components/Privacy/Policy';
 function App() {
 
   const {user} = useContext(AuthContext);
@@ -36,6 +37,7 @@ function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/privacy" element={<Policy />} />
         </Routes>
         <Footer />
       </div>

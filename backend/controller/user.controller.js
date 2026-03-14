@@ -3,6 +3,64 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import Razorpay from "razorpay";
 import Transaction from "../models/transaction.model.js";
+import Workspace from "../models/workspace.model.js";
+import {
+    trackUserSignup,
+    trackUserLogin,
+    trackPaymentSuccess,
+    trackPaymentFailed,
+    identifyDestylUser,
+    identifyDestylGroup
+} from "../utils/destyl.js";
+
+const slugify = (value) =>
+    String(value || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+const ensureWorkspace = async (user) => {
+    if (user.workspaceId) return user.workspaceId;
+    const baseSlug = slugify(user.email || user.name || String(user._id));
+    let slug = baseSlug || `workspace-${String(user._id).slice(-6)}`;
+    let suffix = 1;
+    while (await Workspace.findOne({ slug })) {
+        slug = `${baseSlug}-${suffix}`;
+        suffix += 1;
+    }
+    const workspace = await Workspace.create({
+        name: `${user.name || "User"} Workspace`,
+        slug,
+        ownerId: user._id,
+        members: [user._id],
+        destylProjectId: process.env.DESTYL_PROJECT_ID || null,
+        destylIngestKey: process.env.DESTYL_INGEST_KEY || null
+    });
+    await User.findByIdAndUpdate(user._id, { workspaceId: workspace._id });
+    return workspace._id;
+};
+
+const getDestylContext = async (workspaceId) => {
+    if (!workspaceId) {
+        return {
+            accountId: null,
+            ingestKey: process.env.DESTYL_INGEST_KEY || "",
+            projectId: process.env.DESTYL_PROJECT_ID || null,
+            workspaceName: null,
+            workspaceSlug: null
+        };
+    }
+
+    const workspace = await Workspace.findById(workspaceId).lean();
+    return {
+        accountId: String(workspace?._id || workspaceId),
+        ingestKey: workspace?.destylIngestKey || process.env.DESTYL_INGEST_KEY || "",
+        projectId: workspace?.destylProjectId || process.env.DESTYL_PROJECT_ID || null,
+        workspaceName: workspace?.name || null,
+        workspaceSlug: workspace?.slug || null
+    };
+};
 
 const userRegister = async(req, res) => {
     try {
@@ -33,9 +91,49 @@ const userRegister = async(req, res) => {
         })
     
         const user = await userData.save()
-    
+        const workspaceId = await ensureWorkspace(user);
+        const destyl = await getDestylContext(workspaceId);
+
         const token = jwt.sign({id:user._id}, process.env.JWT_SECRET)
-    
+
+        void identifyDestylGroup({
+            accountId: destyl.accountId,
+            ingestKey: destyl.ingestKey,
+            traits: {
+                workspaceId: destyl.accountId,
+                workspaceName: destyl.workspaceName,
+                workspaceSlug: destyl.workspaceSlug,
+                projectId: destyl.projectId,
+                source: "genartify"
+            }
+        });
+
+        void identifyDestylUser({
+            userId: String(user._id),
+            accountId: destyl.accountId,
+            ingestKey: destyl.ingestKey,
+            traits: {
+                email: user.email,
+                name: user.name,
+                credits: user.creditBalance,
+                workspaceId: destyl.accountId,
+                source: "genartify"
+            }
+        });
+
+        void trackUserSignup({
+            userId: String(user._id),
+            accountId: destyl.accountId,
+            ingestKey: destyl.ingestKey,
+            properties: {
+                email: user.email,
+                name: user.name,
+                credits: user.creditBalance,
+                workspaceId: destyl.accountId,
+                projectId: destyl.projectId
+            }
+        })
+
         res.json({success: true, token, user: user, message:"User register successfully"})
     } catch (error) {
         console.log(error);
@@ -65,7 +163,35 @@ const userLogin = async(req, res) => {
         }
 
         const token = jwt.sign({id:user._id}, process.env.JWT_SECRET)
-    
+        const workspaceId = await ensureWorkspace(user);
+        const destyl = await getDestylContext(workspaceId);
+
+        void identifyDestylUser({
+            userId: String(user._id),
+            accountId: destyl.accountId,
+            ingestKey: destyl.ingestKey,
+            traits: {
+                email: user.email,
+                name: user.name,
+                credits: user.creditBalance,
+                workspaceId: destyl.accountId,
+                source: "genartify"
+            }
+        });
+
+        void trackUserLogin({
+            userId: String(user._id),
+            accountId: destyl.accountId,
+            ingestKey: destyl.ingestKey,
+            properties: {
+                email: user.email,
+                name: user.name,
+                credits: user.creditBalance,
+                workspaceId: destyl.accountId,
+                projectId: destyl.projectId
+            }
+        })
+
         res.json({success: true, token, user: user, message:"User login successfully"})
 
     } catch (error) {
@@ -178,10 +304,25 @@ const verifyPayment = async(req, res) => {
             const transactionData = await Transaction.findById(orderInfo.receipt);
             
             if(transactionData.payment) {
+                const paymentUser = await User.findById(transactionData.userId);
+                const workspaceId = paymentUser ? await ensureWorkspace(paymentUser) : null;
+                const destyl = await getDestylContext(workspaceId);
+                void trackPaymentFailed({
+                    userId: String(transactionData.userId),
+                    accountId: destyl.accountId || String(transactionData.userId),
+                    ingestKey: destyl.ingestKey,
+                    properties: {
+                        reason: "Payment already processed",
+                        orderId: razorpay_order_id,
+                        projectId: destyl.projectId
+                    }
+                })
                 return res.json({success:false, message: "Payment Failed"})
             }
 
             const userData = await User.findById(transactionData.userId)
+            const workspaceId = userData ? await ensureWorkspace(userData) : null;
+            const destyl = await getDestylContext(workspaceId);
 
             const creditBalance = userData.creditBalance + transactionData.credits
 
@@ -189,8 +330,49 @@ const verifyPayment = async(req, res) => {
 
             await Transaction.findByIdAndUpdate(transactionData._id, {payment:true})
 
+            void trackPaymentSuccess({
+                userId: String(userData._id),
+                accountId: destyl.accountId || String(userData._id),
+                ingestKey: destyl.ingestKey,
+                properties: {
+                    orderId: razorpay_order_id,
+                    plan: transactionData.plan,
+                    amount: transactionData.amount,
+                    credits: transactionData.credits,
+                    newCreditBalance: creditBalance,
+                    projectId: destyl.projectId
+                }
+            })
+
+            void identifyDestylUser({
+                userId: String(userData._id),
+                accountId: destyl.accountId,
+                ingestKey: destyl.ingestKey,
+                traits: {
+                    email: userData.email,
+                    name: userData.name,
+                    credits: creditBalance,
+                    workspaceId: destyl.accountId,
+                    source: "genartify"
+                }
+            });
+
             res.json({success:true, message:"Credit Added"})
         } else {
+            const failedUserId = String(orderInfo?.notes?.userId || "");
+            const failedUser = failedUserId ? await User.findById(failedUserId) : null;
+            const failedWorkspaceId = failedUser ? await ensureWorkspace(failedUser) : null;
+            const destyl = await getDestylContext(failedWorkspaceId);
+            void trackPaymentFailed({
+                userId: failedUserId,
+                accountId: destyl.accountId || String(failedUserId),
+                ingestKey: destyl.ingestKey,
+                properties: {
+                    orderId: razorpay_order_id,
+                    status: orderInfo.status,
+                    projectId: destyl.projectId
+                }
+            })
             res.json({success:false, message: "Payment failed"})
         }
     } catch (error) {
