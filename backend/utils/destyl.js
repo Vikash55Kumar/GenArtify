@@ -2,7 +2,7 @@ import axios from "axios";
 
 const DESTYL_BASE_URL = process.env.DESTYL_BASE_URL || "";
 const DESTYL_INGEST_KEY = process.env.DESTYL_INGEST_KEY || "";
-const DESTYL_TIMEOUT_MS = Number(process.env.DESTYL_TIMEOUT_MS || 2000);
+const DESTYL_TIMEOUT_MS = Number(process.env.DESTYL_TIMEOUT_MS || 8000);
 const DESTYL_DEBUG = process.env.DESTYL_DEBUG === "true";
 
 export const DESTYL_EVENTS = {
@@ -15,17 +15,35 @@ export const DESTYL_EVENTS = {
   PAYMENT_FAILED: "payment.failed"
 };
 
-const isConfigured = () => Boolean(DESTYL_BASE_URL && DESTYL_INGEST_KEY);
-
 const resolveIngestKey = (ingestKey) => ingestKey || DESTYL_INGEST_KEY || "";
 
+let warnedBaseUrl = false;
+let warnedIngestKey = false;
+
+const logMisconfiguration = (reason) => {
+  if (reason === "base-url" && !warnedBaseUrl) {
+    warnedBaseUrl = true;
+    console.warn("[Destyl] telemetry skipped: DESTYL_BASE_URL is missing");
+  }
+  if (reason === "ingest-key" && !warnedIngestKey) {
+    warnedIngestKey = true;
+    console.warn("[Destyl] telemetry skipped: DESTYL_INGEST_KEY (or workspace destylIngestKey) is missing");
+  }
+};
+
 const postToDestyl = async (path, payload, ingestKey) => {
-  if (!DESTYL_BASE_URL) return { ok: false, skipped: true };
+  if (!DESTYL_BASE_URL) {
+    logMisconfiguration("base-url");
+    return { ok: false, skipped: true, reason: "missing_base_url" };
+  }
   const key = resolveIngestKey(ingestKey);
-  if (!key) return { ok: false, skipped: true };
+  if (!key) {
+    logMisconfiguration("ingest-key");
+    return { ok: false, skipped: true, reason: "missing_ingest_key" };
+  }
 
   try {
-    await axios.post(
+    const response = await axios.post(
       `${DESTYL_BASE_URL.replace(/\/$/, "")}${path}`,
       payload,
       {
@@ -36,12 +54,23 @@ const postToDestyl = async (path, payload, ingestKey) => {
         timeout: DESTYL_TIMEOUT_MS
       }
     );
-    return { ok: true };
+    return { ok: true, status: response.status };
   } catch (error) {
-    if (DESTYL_DEBUG) {
-      console.error("[Destyl] send failed", path, error?.message || error);
+    const status = error?.response?.status;
+    const responseData = error?.response?.data;
+    const message = error?.message || "unknown_error";
+
+    if (DESTYL_DEBUG || status === 401 || status === 403 || status >= 500) {
+      console.error("[Destyl] send failed", {
+        path,
+        status,
+        message,
+        responseData,
+        baseUrl: DESTYL_BASE_URL
+      });
     }
-    return { ok: false, error };
+
+    return { ok: false, error, status, message };
   }
 };
 
