@@ -4,6 +4,7 @@ import Workspace from "../models/workspace.model.js";
 import FormData from "form-data";
 import {
     trackImageGenerate,
+    trackImageGenerateFailed,
     trackCreditsConsume,
     trackCreditsExhausted,
     identifyDestylUser
@@ -33,11 +34,19 @@ const generateImage = async(req, res) => {
         console.log(prompt);
         
         if(!prompt) {
+            void trackImageGenerateFailed({
+                anonymousId: String(req.user?.id || "image-missing-prompt"),
+                properties: { reason: "missing_prompt" }
+            })
             return res.json({success:false, message: "Prompt are required"})
         }
         const user = await User.findById(req.user.id);
 
         if(!user) {
+            void trackImageGenerateFailed({
+                anonymousId: String(req.user?.id || "image-user-missing"),
+                properties: { reason: "user_not_found" }
+            })
             return res.json({success:false, message: "User not exist"})
         }
 
@@ -48,6 +57,15 @@ const generateImage = async(req, res) => {
         const accountId = destyl.accountId || String(user._id);
 
         if(user.creditBalance === 0) {
+            void trackImageGenerateFailed({
+                userId: String(user._id),
+                accountId,
+                ingestKey: destyl.ingestKey,
+                properties: {
+                    reason: "no_credits",
+                    projectId: destyl.projectId
+                }
+            })
             void trackCreditsExhausted({
                 userId: String(user._id),
                 accountId,
@@ -131,6 +149,13 @@ const generateImage = async(req, res) => {
         res.json({success:true, message: "Image Generated Successfully", creditBalance: userUpdate.creditBalance, resultImage})
 
     } catch (error) {
+        void trackImageGenerateFailed({
+            anonymousId: String(req.user?.id || "image-generate-exception"),
+            properties: {
+                reason: "exception",
+                error: error?.message || "unknown_error"
+            }
+        })
         console.log(error);
         res.json({success: false, message: error.message})
     }

@@ -6,9 +6,15 @@ import Transaction from "../models/transaction.model.js";
 import Workspace from "../models/workspace.model.js";
 import {
     trackUserSignup,
+    trackUserSignupFailed,
     trackUserLogin,
+    trackUserLoginFailed,
+    trackUserLogout,
+    trackUserCreditsViewed,
+    trackPaymentInitiated,
     trackPaymentSuccess,
     trackPaymentFailed,
+    trackPaymentVerificationFailed,
     identifyDestylUser,
     identifyDestylGroup
 } from "../utils/destyl.js";
@@ -68,16 +74,28 @@ const userRegister = async(req, res) => {
         console.log(name, email, password, confirmPassword);
         
         if(!name || !email || !password || !confirmPassword) {
+            void trackUserSignupFailed({
+                anonymousId: email || name || "signup-missing-fields",
+                properties: { reason: "missing_fields" }
+            });
             return res.json({success:false, message: "All fields are required"})
         }
 
         if(!(password === confirmPassword)) {
+            void trackUserSignupFailed({
+                anonymousId: email,
+                properties: { reason: "password_mismatch", email }
+            });
             return res.json({success:false, message: "Password not same"})
         }
 
         const existUser = await User.findOne({email});
 
         if(existUser) {
+            void trackUserSignupFailed({
+                anonymousId: email,
+                properties: { reason: "user_exists", email }
+            });
             return res.json({success:false, message: "User already exist with this email"})
         }
     
@@ -136,6 +154,13 @@ const userRegister = async(req, res) => {
 
         res.json({success: true, token, user: user, message:"User register successfully"})
     } catch (error) {
+        void trackUserSignupFailed({
+            anonymousId: req.body?.email || "signup-exception",
+            properties: {
+                reason: "exception",
+                error: error?.message || "unknown_error"
+            }
+        });
         console.log(error);
         res.json({success: false, message: error.message})
     }
@@ -147,18 +172,30 @@ const userLogin = async(req, res) => {
         console.log(email, password);
         
         if(!email || !password) {
+            void trackUserLoginFailed({
+                anonymousId: email || "login-missing-fields",
+                properties: { reason: "missing_fields" }
+            });
             return res.json({success:false, message: "All fields are required"})
         }
 
         const user = await User.findOne({email});
 
         if(!user) {
+            void trackUserLoginFailed({
+                anonymousId: email,
+                properties: { reason: "user_not_found", email }
+            });
             return res.json({success: false, message: 'User does not exist'});
         }
 
         const isMatch = await bcrypt.compare(password, user.password)
 
         if(!isMatch) {
+            void trackUserLoginFailed({
+                anonymousId: email,
+                properties: { reason: "invalid_credentials", email }
+            });
             return res.json({success:false, message: "Invalid credentials"})
         }
 
@@ -195,6 +232,13 @@ const userLogin = async(req, res) => {
         res.json({success: true, token, user: user, message:"User login successfully"})
 
     } catch (error) {
+        void trackUserLoginFailed({
+            anonymousId: req.body?.email || "login-exception",
+            properties: {
+                reason: "exception",
+                error: error?.message || "unknown_error"
+            }
+        });
         console.log(error);
         res.json({success: false, message: error.message})
     }
@@ -203,6 +247,20 @@ const userLogin = async(req, res) => {
 const userCredit = async(req, res) => {
     try {
         const user = await User.findById(req.user.id);
+
+        if (user) {
+            const workspaceId = await ensureWorkspace(user);
+            const destyl = await getDestylContext(workspaceId);
+            void trackUserCreditsViewed({
+                userId: String(user._id),
+                accountId: destyl.accountId || String(user._id),
+                ingestKey: destyl.ingestKey,
+                properties: {
+                    credits: user.creditBalance,
+                    projectId: destyl.projectId
+                }
+            });
+        }
 
         res.json({success:true, credits: user.creditBalance, name:user.name})
     } catch (error) {
@@ -231,6 +289,9 @@ const razorpayPayment = async(req, res) => {
         if(!user) {
             return res.json({success:false, message: "user not found required"})
         }
+
+        const workspaceId = await ensureWorkspace(user);
+        const destyl = await getDestylContext(workspaceId);
 
         let credits, plan, amount, date
 
@@ -280,9 +341,29 @@ const razorpayPayment = async(req, res) => {
             return res.status(500).json({ success: false, message: "Error creating Razorpay order" });
         }
 
+        void trackPaymentInitiated({
+            userId: String(user._id),
+            accountId: destyl.accountId || String(user._id),
+            ingestKey: destyl.ingestKey,
+            properties: {
+                orderId: order.id,
+                plan,
+                amount,
+                credits,
+                projectId: destyl.projectId
+            }
+        });
+
         res.json({ success: true, message: "Payment Initialized", order });
 
     } catch (error) {
+        void trackPaymentInitiated({
+            anonymousId: String(req.user?.id || "payment-init-exception"),
+            properties: {
+                reason: "exception",
+                error: error?.message || "unknown_error"
+            }
+        });
         console.log(error);
         res.json({success: false, message: error.message})
     }
@@ -373,11 +454,54 @@ const verifyPayment = async(req, res) => {
                     projectId: destyl.projectId
                 }
             })
+            void trackPaymentVerificationFailed({
+                userId: failedUserId || undefined,
+                accountId: destyl.accountId || failedUserId || undefined,
+                ingestKey: destyl.ingestKey,
+                properties: {
+                    orderId: razorpay_order_id,
+                    status: orderInfo.status,
+                    reason: "order_not_paid",
+                    projectId: destyl.projectId
+                }
+            })
             res.json({success:false, message: "Payment failed"})
         }
     } catch (error) {
+        void trackPaymentVerificationFailed({
+            anonymousId: String(req.body?.razorpay_order_id || "payment-verify-exception"),
+            properties: {
+                reason: "exception",
+                error: error?.message || "unknown_error"
+            }
+        });
         console.log(error);
         res.json({success: false, message: error.message})
+    }
+}
+
+const userLogout = async(req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+
+        if (user) {
+            const workspaceId = await ensureWorkspace(user);
+            const destyl = await getDestylContext(workspaceId);
+            void trackUserLogout({
+                userId: String(user._id),
+                accountId: destyl.accountId || String(user._id),
+                ingestKey: destyl.ingestKey,
+                properties: {
+                    email: user.email,
+                    projectId: destyl.projectId
+                }
+            });
+        }
+
+        return res.json({ success: true, message: "User logout tracked" });
+    } catch (error) {
+        console.log(error);
+        return res.json({ success: false, message: error.message });
     }
 }
 
@@ -386,6 +510,7 @@ const verifyPayment = async(req, res) => {
 export {
     userRegister,
     userLogin,
+    userLogout,
     userCredit,
     razorpayPayment,
     verifyPayment

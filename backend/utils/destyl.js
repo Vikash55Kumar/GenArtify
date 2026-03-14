@@ -7,12 +7,19 @@ const DESTYL_DEBUG = process.env.DESTYL_DEBUG === "true";
 
 export const DESTYL_EVENTS = {
   USER_SIGNUP: "user.signup",
+  USER_SIGNUP_FAILED: "user.signup.failed",
   USER_LOGIN: "user.login",
+  USER_LOGIN_FAILED: "user.login.failed",
+  USER_LOGOUT: "user.logout",
+  USER_CREDITS_VIEWED: "user.credits.viewed",
   IMAGE_GENERATE: "image.generate",
+  IMAGE_GENERATE_FAILED: "image.generate.failed",
   CREDITS_CONSUME: "credits.consume",
   CREDITS_EXHAUSTED: "credits.exhausted",
+  PAYMENT_INITIATED: "payment.initiated",
   PAYMENT_SUCCESS: "payment.success",
-  PAYMENT_FAILED: "payment.failed"
+  PAYMENT_FAILED: "payment.failed",
+  PAYMENT_VERIFICATION_FAILED: "payment.verification.failed"
 };
 
 const resolveIngestKey = (ingestKey) => ingestKey || DESTYL_INGEST_KEY || "";
@@ -144,11 +151,26 @@ export const identifyDestylGroup = async ({
 export const trackUserSignup = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.USER_SIGNUP });
 
+export const trackUserSignupFailed = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.USER_SIGNUP_FAILED });
+
 export const trackUserLogin = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.USER_LOGIN });
 
+export const trackUserLoginFailed = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.USER_LOGIN_FAILED });
+
+export const trackUserLogout = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.USER_LOGOUT });
+
+export const trackUserCreditsViewed = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.USER_CREDITS_VIEWED });
+
 export const trackImageGenerate = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.IMAGE_GENERATE });
+
+export const trackImageGenerateFailed = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.IMAGE_GENERATE_FAILED });
 
 export const trackCreditsConsume = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.CREDITS_CONSUME });
@@ -156,8 +178,14 @@ export const trackCreditsConsume = (payload) =>
 export const trackCreditsExhausted = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.CREDITS_EXHAUSTED });
 
+export const trackPaymentInitiated = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.PAYMENT_INITIATED });
+
 export const trackPaymentSuccess = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.PAYMENT_SUCCESS });
 
 export const trackPaymentFailed = (payload) =>
   trackDestylEvent({ ...payload, event: DESTYL_EVENTS.PAYMENT_FAILED });
+
+export const trackPaymentVerificationFailed = (payload) =>
+  trackDestylEvent({ ...payload, event: DESTYL_EVENTS.PAYMENT_VERIFICATION_FAILED });
