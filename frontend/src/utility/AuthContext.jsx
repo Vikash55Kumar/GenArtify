@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback, useMemo } from "react";
 import Cookies from "js-cookie";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     // ✅ Login Function
-    const login = async (credentials) => {
+    const login = useCallback(async (credentials) => {
         try {
             const response = await axios.post(`${api}/users/login`, credentials);
             
@@ -55,24 +55,34 @@ export const AuthProvider = ({ children }) => {
             console.error("Login Error:", error);
             throw error;
         }
-    };
+    }, []);
 
     // ✅ Logout Function
-    const logout = () => {
+    const logout = useCallback(() => {
         Cookies.remove("token");
         setUser(null);
         sessionStorage.clear();
         localStorage.clear();
-        toast.success("Logout Successfully")
-    };
+        toast.success("Logout Successfully");
+    }, []);
 
     // ✅ Update Credits after Payment
-    const updateCredits = (newCredits) => {
+    const updateCredits = useCallback((newCredits) => {
         setCredits(newCredits);
-    };
+    }, []);
+
+    // Memoize the context value to prevent unnecessary re-renders
+    const contextValue = useMemo(() => ({
+        user,
+        credits,
+        loading,
+        login,
+        logout,
+        updateCredits
+    }), [user, credits, loading, login, logout, updateCredits]);
 
     return (
-        <AuthContext.Provider value={{ user, credits, loading, login, logout, updateCredits }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );

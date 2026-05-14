@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken'
-
-
+import { identify } from '@phylaco/node';
 
 // const userAuth = async(req, res, next) => {
 //     const token = req.headers.authorization;
@@ -35,10 +34,10 @@ const userAuth = async (req, res, next) => {
     }
 
     const tokenValue = token.split(" ")[1]; 
-    // console.log("Extracted Token:", tokenValue);
 
     try {
         const decoded = jwt.verify(tokenValue, process.env.JWT_SECRET);
+        identify(String(decoded.id));
         req.user = decoded;
         next();
     } catch (error) {

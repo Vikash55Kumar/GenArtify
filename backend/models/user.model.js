@@ -2,29 +2,27 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
     name : {
-        type:String,
-        required:true,
+        type: String,
+        required: true,
+        trim: true
     },
-
     email : {
-        type:String,
+        type: String,
         required: true,
         index: true,
-        unique: true
+        unique: true,
+        trim: true
     },
-
     password: {
-        type:String,
+        type: String,
         required: true,
     },
-
     creditBalance: {
-        type:Number,
+        type: Number,
         default: 5
     },
-
     generatedImage: [{
-        image:String,
+        image: String,
         date: { 
             type: Date, 
             default: Date.now 
@@ -36,7 +34,11 @@ const userSchema = new mongoose.Schema({
         index: true
     },
 
-}, { timestamps: true })
+}, { 
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+})
 
 const User = mongoose.models.user || mongoose.model("User", userSchema)
 

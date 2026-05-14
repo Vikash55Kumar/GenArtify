@@ -41,8 +41,6 @@ export const register = (credentials) => async (dispatch) => {
 
         const response = await axios.post(`${api}/users/register`, credentials);
 
-        console.log("response", response);
-
         dispatch({
             type: USER_SIGNUP_SUCCESS,
             payload: response.data
@@ -52,7 +50,7 @@ export const register = (credentials) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: USER_SIGNUP_FAIL,
-            payload: error.response.data.message || error.message
+            payload: error.response?.data?.message || error.message
         });
         throw error;
     }
@@ -63,7 +61,6 @@ export const generateImage = (credentials) => async (dispatch) => {
         dispatch({ type: GENERATE_IMAGE_REQUEST });
 
         const Token = Cookies.get('token');
-        console.log(Token);
         
         if (!Token) {
             throw new Error("Token not found");
@@ -77,8 +74,6 @@ export const generateImage = (credentials) => async (dispatch) => {
 
         const response = await axios.post(`${api}/image/generate-image`, credentials, config);
 
-        console.log("response", response);
-
         dispatch({
             type: GENERATE_IMAGE_SUCCESS,
             payload: response.data
@@ -88,7 +83,7 @@ export const generateImage = (credentials) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: GENERATE_IMAGE_FAIL,
-            payload: error.response.data.message || error.message
+            payload: error.response?.data?.message || error.message
         });
         throw error;
     }
@@ -99,7 +94,6 @@ export const razorpayPayment = (planId) => async (dispatch) => {
         dispatch({ type: RAZOR_PAYMENT_REQUEST });
 
         const Token = Cookies.get('token');
-        console.log(Token);
         
         if (!Token) {
             throw new Error("Token not found");
@@ -122,7 +116,7 @@ export const razorpayPayment = (planId) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: RAZOR_PAYMENT_FAIL,
-            payload: error.response.data.message || error.message
+            payload: error.response?.data?.message || error.message
         });
         throw error;
     }
@@ -131,11 +125,8 @@ export const razorpayPayment = (planId) => async (dispatch) => {
 export const verifyPayment = (razorpay_order_id) => async (dispatch) => {
     try {
         dispatch({ type: VERIFY_PAYMENT_REQUEST });
-        console.log("axios verify", razorpay_order_id);
         
         const response = await axios.post(`${api}/users/verify-payment`,{razorpay_order_id});
-
-        console.log("response", response);
 
         dispatch({
             type: VERIFY_PAYMENT_SUCCESS,
@@ -146,7 +137,7 @@ export const verifyPayment = (razorpay_order_id) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: VERIFY_PAYMENT_FAIL,
-            payload: error.response.data.message || error.message
+            payload: error.response?.data?.message || error.message
         });
         throw error;
     }

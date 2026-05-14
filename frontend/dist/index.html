@@ -5,11 +5,55 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Genartify</title>
-    <script type="module" crossorigin src="/assets/index-CJ9Sd14X.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Bq5PlTG_.css">
+    <script type="module" crossorigin src="/assets/index-CsHO3puA.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BjS4JPFH.css">
   </head>
   <body>
     <div id="root"></div>
+
+    <script>
+      (function (window, document) {
+        var ph = (window.phylaco = window.phylaco || []);
+        if (ph.__initialized) return;
+
+        ph.__initialized = true;
+        ph._q = [];
+
+        // 🔷 queue system (VERY IMPORTANT)
+        function enqueue(method, args) {
+          ph._q.push({ method: method, args: args });
+        }
+
+        // 🔷 public API (like PostHog)
+        var methods = ["init", "identify", "track", "reset"];
+
+        methods.forEach(function (method) {
+          ph[method] = function () {
+            enqueue(method, arguments);
+          };
+        });
+
+        // 🔷 load real SDK async
+        var script = document.createElement("script");
+        script.async = true;
+        // script.src = "/phylaco.min.js"; // local @phylaco/browser test bundle
+        script.src="https://cdn.phylaco.com/browser/v0.1.4/phylaco.min.js";
+
+        var firstScript = document.getElementsByTagName("script")[0];
+        firstScript.parentNode.insertBefore(script, firstScript);
+
+      })(window, document);
+
+	      // 🔥 init call (client will change later)
+	      phylaco.init({
+          debug: "%VITE_PHYLACO_DEBUG%",
+	        consent: true,
+          ingestUrl: "%VITE_PHYLACO_INGEST_URL%",
+          projectKey: "%VITE_PHYLACO_PROJECT_KEY%",
+	        serviceName: "%VITE_PHYLACO_SERVICE_NAME%",
+	      });
+    </script>
+    
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </body>
 </html>

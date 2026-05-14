@@ -14,6 +14,17 @@ function App() {
 
   const {user} = useContext(AuthContext);
 
+  useEffect(() => {
+    const userId = user?._id;
+
+    if (userId) {
+      window.phylaco?.identify?.(userId);
+      return;
+    }
+
+    window.phylaco?.reset?.();
+  }, [user?._id]);
+
   return (
     <>
       <ToastContainer 

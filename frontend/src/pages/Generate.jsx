@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { ImagePlus, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
-import SpinnerLoader from '../utility/SpinnerLoader';
 import { generateImage } from '../action/userAction';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -11,44 +10,61 @@ export function Generate() {
   const navigate = useNavigate();
 
   const [prompt, setPrompt] = useState('');
-  const [image, setImage] = useState('/sessions_hero.png')
+  const [image, setImage] = useState('/sessions_hero.png');
   const [loading, setLoading] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  const handleGenerate = async(e) => {
+  // Memoize the image preview to prevent unnecessary re-renders
+  const imagePreview = useMemo(() => (
+    <div className="relative flex flex-col items-center">
+      {image && (
+        <img 
+          src={image} 
+          alt="Generated" 
+          className="max-w-sm rounded-md shadow-md" 
+          onLoad={() => setIsImageLoaded(true)}
+          onError={() => setIsImageLoaded(false)}
+        />
+      )}
+      {loading && (
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 animate-pulse" />
+      )}
+    </div>
+  ), [image, loading]);
+
+  // Use useCallback to prevent function recreation on every render
+  const handleGenerate = useCallback(async (e) => {
     e.preventDefault();
     setLoading(true);
     
-     const myForm = {
-      prompt
-    };
+    const myForm = { prompt };
 
     try {
       const response = await dispatch(generateImage(myForm));
       
       if (response.success === true) {
-          toast.success(response.message || "Image Generated Successfully!");
-          setPrompt("")
-          setIsImageLoaded(true)
-          setImage(response.resultImage)
-          setLoading(false); // Hide spinner after successful login
+        toast.success(response.message || "Image Generated Successfully!");
+        setPrompt("");
+        setIsImageLoaded(true);
+        setImage(response.resultImage);
+        setLoading(false);
       } else {
-        if(response.creditBalance === 0) {
+        if (response.creditBalance === 0) {
           toast.error(response.message || "No credit");
           setLoading(false);
           navigate("/pricing");
         }
       }
     } catch (error) {
-        toast.error('Image Generation failed!');
-        setLoading(false); // Hide spinner after error
+      toast.error('Image Generation failed!');
+      setLoading(false);
     }
-  };
+  }, [prompt, dispatch, navigate]);
 
   const handleGenerateAnother = () => {
-    setIsImageLoaded(false)
-    setLoading(false)
-  }
+    setIsImageLoaded(false);
+    setLoading(false);
+  };
 
   return (
     <div className="flex items-center justify-center bg-gray-50 py-12">
@@ -57,19 +73,7 @@ export function Generate() {
 
         <form onSubmit={handleGenerate} className="space-y-6">
           {/* Image Preview & Loading Animation */}
-          <div className="relative flex flex-col items-center">
-            {image ? (
-              <img src={image} alt="Generated" className="max-w-sm rounded-md shadow-md" />
-            ) : (
-              <div className="w-full h-40 bg-gray-200 flex items-center justify-center rounded-md">
-                <p className="text-gray-500">Your generated image will appear here</p>
-              </div>
-            )}
-
-            {loading && (
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500 animate-pulse" />
-            )}
-          </div>
+          {imagePreview}
 
           {/* Loading Text */}
           {loading && <p className="text-center text-gray-500">Generating image, please wait...</p>}
@@ -122,7 +126,6 @@ export function Generate() {
               </a>
             </div>
           }
-
         </form>
       </div>
     </div>

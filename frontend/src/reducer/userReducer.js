@@ -16,6 +16,18 @@ import {
     LOAD_CREDIT_SUCCESS,
     LOAD_CREDIT_FAIL,
     
+    GENERATE_IMAGE_REQUEST,
+    GENERATE_IMAGE_SUCCESS,
+    GENERATE_IMAGE_FAIL,
+
+    RAZOR_PAYMENT_REQUEST,
+    RAZOR_PAYMENT_SUCCESS,
+    RAZOR_PAYMENT_FAIL,
+
+    VERIFY_PAYMENT_REQUEST,
+    VERIFY_PAYMENT_SUCCESS,
+    VERIFY_PAYMENT_FAIL,
+
 } from "../constants/userConstants"
 
 export const getUserReducer = (state = {userDetail : {}}, action) => {
@@ -82,7 +94,7 @@ export const getUserReducer = (state = {userDetail : {}}, action) => {
 //             return {
 //                 ...state,
 //                 loading : false,
-//                 isAuthenticated: false,
+//                 isAuthenticated: true,
 //                 user : action.payload
 //             };
 
@@ -96,44 +108,54 @@ export const userReducer = (state = { user: {} }, action) => {
         case USER_SIGNUP_REQUEST:
         case USER_LOGIN_REQUEST:
         case LOAD_CREDIT_REQUEST:
+        case GENERATE_IMAGE_REQUEST:
+        case RAZOR_PAYMENT_REQUEST:
+        case VERIFY_PAYMENT_REQUEST:
             return {
                 ...state,
                 loading: true,
                 isAuthenticated: false,
-                error: null, // ✅ Clear previous errors when starting a new request
+                error: null,
             };
 
         case USER_LOGIN_SUCCESS:
         case LOAD_CREDIT_SUCCESS:
+        case GENERATE_IMAGE_SUCCESS:
             return {
                 ...state,
                 loading: false,
                 isAuthenticated: true,
                 user: action.payload,
-                error: null, // ✅ Clear error on successful login
+                error: null,
             };
 
         case USER_SIGNUP_SUCCESS:
+        case RAZOR_PAYMENT_SUCCESS:
+        case VERIFY_PAYMENT_SUCCESS:
             return {
                 ...state,
                 loading: false,
-                isAuthenticated: true, // ✅ Set authenticated to true on successful signup
+                isAuthenticated: true,
                 user: action.payload,
-                error: null, // ✅ Clear error on successful signup
+                error: null,
             };
 
         case USER_SIGNUP_FAIL:
         case USER_LOGIN_FAIL:
         case LOAD_CREDIT_FAIL:
+        case GENERATE_IMAGE_FAIL:
+        case RAZOR_PAYMENT_FAIL:
+        case VERIFY_PAYMENT_FAIL:
             return {
                 ...state,
                 loading: false,
                 isAuthenticated: false,
                 user: null,
-                error: action.payload, // ✅ Store error only on failure
+                error: action.payload,
             };
 
         default:
             return state;
     }
 };
+
