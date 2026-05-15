@@ -54,6 +54,9 @@ app.use(express.static(buildPath, {
     etag: false,
 }));
 
+app.set('trust proxy', 1); // Trust the first hop (Cloud Run's proxy)
+
+
 // Fallback to index.html for frontend routes
 app.get("*", (req, res) => {
   res.sendFile(path.join(buildPath, "index.html"));
