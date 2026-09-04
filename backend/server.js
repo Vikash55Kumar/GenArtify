@@ -1,16 +1,19 @@
 import express from 'express';
 import cors from 'cors';
-import 'dotenv/config'
+import 'dotenv/config';
 import connectDB from './config/db.js';
 import userRouter from './routers/user.router.js';
 import imageRouter from './routers/image.route.js';
-import path from 'path'
-import cookieParser from 'cookie-parser'
-import { phylaco } from '@phylaco/node'
-import rateLimit from 'express-rate-limit'
+import path from 'path';
+import fs from 'fs';
+import cookieParser from 'cookie-parser';
+import { phylaco } from '@phylaco/node';
+import rateLimit from 'express-rate-limit';
 
-const PORT = process.env.PORT;
-const app = express()
+const PORT = process.env.PORT || 4000;
+const app = express();
+
+app.set('trust proxy', 1);
 
 phylaco.init(app, {
   ingestUrl: process.env.PHYLACO_INGEST_URL,
@@ -27,9 +30,18 @@ app.use(cors({
     methods: 'DELETE, POST, GET, PUT',
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-phylaco-trace-id'], 
     credentials: true,
-}))
+}));
 
-await connectDB()
+// Ensure database connection for all requests
+app.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (error) {
+        console.error("Database connection failed:", error);
+        res.status(500).json({ success: false, message: "Database connection failed" });
+    }
+});
 
 // Add rate limiting
 const limiter = rateLimit({
@@ -37,7 +49,7 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-})
+});
 
 app.use('/api', limiter);
 
@@ -47,20 +59,20 @@ app.use('/api/v1/image', imageRouter)
 
 app.get('/', (req, res) => res.send('API Working'))
 
+// Serve frontend if dist directory exists (for monolithic container deployments)
 const __dirname = path.resolve();
 const buildPath = path.join(__dirname, "../frontend/dist");
-app.use(express.static(buildPath, {
-    maxAge: '1d',
-    etag: false,
-}));
+if (fs.existsSync(buildPath)) {
+    app.use(express.static(buildPath, {
+        maxAge: '1d',
+        etag: false,
+    }));
 
-app.set('trust proxy', 1); // Trust the first hop (Cloud Run's proxy)
-
-
-// Fallback to index.html for frontend routes
-app.get("*", (req, res) => {
-  res.sendFile(path.join(buildPath, "index.html"));
-});
+    // Fallback to index.html for frontend routes
+    app.get("*", (req, res) => {
+        res.sendFile(path.join(buildPath, "index.html"));
+    });
+}
 
 app.listen(PORT, () => console.log(`Server running on port: ${PORT}`))
 
